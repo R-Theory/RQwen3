@@ -1,0 +1,7 @@
+# Qwen3 Analysis - Project-Specific Dependencies
+# Core dependencies (transformers, torch, etc.) are in the parent requirements.txt
+# This file is for anything truly specific to this project.
+#
+# Currently: all needed packages are in the parent requirements.txt.
+# If you add something here, install with:
+#   pip install -r requirements-local.txt

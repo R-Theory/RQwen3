@@ -1,0 +1,6 @@
+# Heavy artifacts — kept on disk, never committed
+data/*
+snapshots/*
+checkpoints
+!data/.gitkeep
+!**/.gitkeep
