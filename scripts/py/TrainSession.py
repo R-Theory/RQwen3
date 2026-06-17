@@ -13,6 +13,7 @@ Run directly for a test:
     python3 scripts/py/TrainSession.py
 """
 
+import contextlib
 import os
 import sys
 from typing import Any, Iterator
@@ -145,16 +146,24 @@ class TrainSession:
         self.model.train()
         accumulated_loss: float = 0.0
 
+        # bf16 autocast on CUDA: cuts activation memory ~2x and uses BF16
+        # tensor cores. No-op on MPS/CPU (preserves local smoke-test behavior).
+        # No GradScaler needed because bf16 has fp32-equivalent dynamic range.
+        use_amp = self.device.type == 'cuda'
+        amp_ctx = torch.autocast(device_type='cuda', dtype=torch.bfloat16) if use_amp \
+                  else contextlib.nullcontext()
+
         # Process grad_accum_steps micro-batches before updating weights
         for _ in range(self.config.grad_accum_steps):
             input_ids, labels = next(data_iter)
             input_ids = input_ids.to(self.device)
             labels = labels.to(self.device)
 
-            logits: torch.Tensor = self.model(input_ids)
-            # Divide loss by accum steps so the total gradient magnitude
-            # is the same regardless of how many micro-batches we use
-            loss: torch.Tensor = compute_loss(logits, labels) / self.config.grad_accum_steps
+            with amp_ctx:
+                logits: torch.Tensor = self.model(input_ids)
+                # Divide loss by accum steps so the total gradient magnitude
+                # is the same regardless of how many micro-batches we use
+                loss: torch.Tensor = compute_loss(logits, labels) / self.config.grad_accum_steps
             loss.backward()
             accumulated_loss += loss.item()
 

@@ -1,6 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude
+.claude/
+CLAUDE.md
+
 # Heavy artifacts — kept on disk, never committed
 data/*
-snapshots/*
-checkpoints
 !data/.gitkeep
-!**/.gitkeep
+snapshots/*
+!snapshots/.gitkeep
+checkpoints
+checkpoints_local/
+figures/*
+!figures/.gitkeep
+
+# Cluster surface — personal paths embedded; public version TBD
+longleaf/
+Makefile
+.rsyncignore
+scripts/sh/
+docs/cluster-operations.md
+docs/slurm-longleaf-guide.md

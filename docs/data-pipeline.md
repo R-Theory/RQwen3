@@ -6,6 +6,7 @@ tags:
   - tokenization
   - pretraining
 created: 2026-04-01
+updated: 2026-06-15
 status: complete
 related:
   - "[[project-overview]]"
@@ -48,9 +49,9 @@ Six sources, ~13B tokens total, targeting Chinchilla-optimal for 751M params:
 | FineWeb-Edu | `HuggingFaceFW/fineweb-edu` | ~7B | 54% | Backbone: broad educational web | score >= 3, length 100-100K |
 | Wikipedia | `wikimedia/wikipedia` `20231101.en` | ~2B | 15% | Factual grounding | drop stubs < 500, drop disambiguation |
 | OpenWebMath | `open-web-math/open-web-math` | ~1.5B | 12% | Math/stats (STOR155, DATA120) | length >= 200 |
-| StackExchange | `HuggingFaceH4/stack-exchange-preferences` | ~1B | 8% | Q&A interaction patterns | chosen answers, length >= 100 |
-| peS2o | `allenai/peS2o` `v2` | ~1B | 8% | Academic reasoning (CS, psych, stats) | length >= 1000 |
-| Textbooks | `nampdn-ai/tiny-textbooks` | ~0.5B | 4% | Structured explanations | length >= 100 |
+| StackExchange | `HuggingFaceH4/stack-exchange-preferences` | ~1B | 8% | Q&A interaction patterns | selected answer (fallback: highest `pm_score`), length >= 100 |
+| peS2o | `MaLA-LM/peS2o-final` | ~1B | 8% | Academic reasoning (CS, psych, stats) | length >= 1000 |
+| Textbooks | `HuggingFaceTB/cosmopedia` (config `stanford`) | ~0.5B | 4% | Structured explanations | length >= 100 |
 | **Total** | | **~13B** | **100%** | | |
 
 ### Why These Sources
@@ -63,9 +64,9 @@ Six sources, ~13B tokens total, targeting Chinchilla-optimal for 751M params:
 
 - **StackExchange (8%)**: Q&A format is exactly the interaction pattern of an educational assistant. Covers CS (StackOverflow), math (Math.SE), stats (CrossValidated), and psychology (Cogsci.SE).
 
-- **peS2o (8%)**: 40B tokens of open-access academic papers from Semantic Scholar. Covers psychology (PSYC101), computer science (COMP110), and data science. Academic writing teaches the model formal explanation patterns.
+- **peS2o (8%)**: Open-access academic papers from Semantic Scholar. Covers psychology (PSYC101), computer science (COMP110), and data science. Academic writing teaches the model formal explanation patterns. We use `MaLA-LM/peS2o-final` — a parquet-native re-export of `allenai/peS2o` v2 (the original required a Python loader script, deprecated by `datasets ≥ 5.0`).
 
-- **Textbooks (4%)**: The Phi-1.5 paper (Gunasekar et al., 2023) showed that even a small amount of textbook-quality data dramatically improves model capability at this scale. 4% is enough to have an outsized impact without dominating the mix.
+- **Textbooks (4%)**: The Phi-1.5 paper (Gunasekar et al., 2023) showed that even a small amount of textbook-quality data dramatically improves model capability at this scale. 4% is enough to have an outsized impact without dominating the mix. We use `HuggingFaceTB/cosmopedia` config `stanford` — ungated, Apache-2.0, CS-focused synthetic textbooks. (The originally-planned `nampdn-ai/tiny-textbooks` is gated.)
 
 ### Mixing Ratios Justification
 
@@ -82,9 +83,9 @@ Six sources, ~13B tokens total, targeting Chinchilla-optimal for 751M params:
 Single script that downloads, filters, deduplicates, tokenizes, and packs all 6 sources into binary shard files.
 
 ```bash
-# Full build on Longleaf (via build-data.slurm):
+# Full build:
 python scripts/build_dataset.py \
-    --output-dir /work/users/t/r/treese20/data/rqwen3-pretrain/v1
+    --output-dir data/rqwen3-pretrain/v1
 
 # Local test with small subset:
 python scripts/build_dataset.py \
@@ -96,6 +97,12 @@ python scripts/build_dataset.py \
     --output-dir ./data/fineweb-only \
     --sources fineweb-edu wikipedia
 ```
+
+### Multi-Job Builds
+
+The full 13B build doesn't always fit in a single run, so it can be split across multiple invocations of `build_dataset.py` (one per remaining-source list). After all runs finish, `python scripts/stitch_manifest.py <output-dir>` re-scans every `.bin` on disk, re-aggregates per-source token/doc counts, and writes a unified `manifest.json`.
+
+This is how the actual 13B dataset was assembled.
 
 ### Processing Flow (per source)
 
@@ -128,7 +135,7 @@ Each shard is a flat file of `np.uint32` token IDs. No headers, no metadata, no 
 
 - **dtype**: `uint32` (4 bytes/token) — required because Qwen3's vocab is 151,936 (exceeds uint16 max of 65,535)
 - **Total size**: 13B tokens × 4 bytes = ~52GB on disk
-- **Location**: `/work/users/t/r/treese20/data/rqwen3-pretrain/v1/`
+- **Location**: `<DATA_DIR>/rqwen3-pretrain/v1/`
 
 ### Directory Layout
 
@@ -216,7 +223,7 @@ from torch.utils.data import DataLoader
 
 loader = DataLoader(
     dataset,
-    batch_size=4,
+    batch_size=2,    # production setting (effective batch=128 via grad_accum=64)
     shuffle=True,    # random access — proper shuffling
     num_workers=4,
     pin_memory=True,
@@ -272,25 +279,6 @@ When training is interrupted and resumed, the model picks up from the right step
 
 ## Running the Pipeline
 
-### On Longleaf (production)
-
-```bash
-# 1. Sync code to cluster
-make sync
-
-# 2. Submit the build job (CPU-only, ~4-12 hours)
-sbatch longleaf/build-data.slurm
-
-# 3. Monitor progress
-make logs JOB=<job_id>
-
-# 4. When complete, verify output
-make remote-ls   # check files exist
-
-# 5. Train — pretrain.py auto-detects local data
-make submit      # submits pretrain.slurm
-```
-
 ### Local Testing
 
 ```bash
@@ -341,8 +329,7 @@ print(text[:500])
 | --- | --- |
 | `src/data.py` | `StreamingTokenDataset` + `PreTokenizedDataset` classes |
 | `scripts/build_dataset.py` | Full preprocessing pipeline (download, filter, dedup, tokenize, pack) |
-| `longleaf/build-data.slurm` | CPU-only SLURM job for building the dataset |
-| `longleaf/scripts/py/pretrain.py` | Training script (auto-detects local data) |
+| `scripts/stitch_manifest.py` | Re-scan shards & write a unified `manifest.json` after a multi-job build |
 | `src/training.py` | Checkpoint save/load with `data_offset` |
 | `scripts/py/TrainSession.py` | Training session manager with data offset tracking |
 
@@ -350,6 +337,4 @@ print(text[:500])
 
 ## Related
 
-- [[project-overview]] — Architecture, training progress, cluster setup journey
-- [[cluster-operations]] — Practical commands for Longleaf
-- [[slurm-longleaf-guide]] — SLURM fundamentals and auto-resume system
+- [[project-overview]] — Architecture and training progress

@@ -5,9 +5,9 @@ This script downloads, filters, deduplicates, tokenizes, and packs text from
 for fast, reproducible training.
 
 Usage:
-    # Full build (run on Longleaf CPU node via build-data.slurm):
+    # Full build:
     python scripts/build_dataset.py \
-        --output-dir /work/users/t/r/treese20/data/rqwen3-pretrain/v1
+        --output-dir data/rqwen3-pretrain/v1
 
     # Quick local test with a small subset:
     python scripts/build_dataset.py \
@@ -72,13 +72,21 @@ def _wiki_filter(example):
 
 
 def _stackexchange_extract(example):
-    """Extract Q&A text from StackExchange preferences format."""
+    """Extract Q&A text from StackExchange preferences format.
+
+    Schema: {qid, question, answers: [{answer_id, pm_score, selected, text, ...}], date, metadata}
+    Prefer the asker-selected answer; fall back to highest pm_score.
+    """
     question = example.get('question', '')
-    # The dataset has 'chosen' and 'rejected' answers — use the chosen one
-    chosen = example.get('chosen', '')
-    if not question or not chosen:
+    answers = example.get('answers') or []
+    if not question or not answers:
         return None
-    return f"Question: {question}\n\nAnswer: {chosen}"
+    selected = [a for a in answers if a.get('selected')]
+    chosen = selected[0] if selected else max(answers, key=lambda a: a.get('pm_score', 0) or 0)
+    text = chosen.get('text', '')
+    if not text:
+        return None
+    return f"Question: {question}\n\nAnswer: {text}"
 
 
 SOURCES = [
@@ -112,16 +120,23 @@ SOURCES = [
         custom_extract=_stackexchange_extract,
     ),
     SourceConfig(
+        # Replaces allenai/peS2o (v2 only ships as a Python loader script,
+        # which datasets>=5.0 refuses to run). MaLA-LM/peS2o-final is a
+        # parquet-native re-export of the same corpus; text in `content`.
         name='pes2o',
-        hf_path='allenai/peS2o',
-        hf_config='v2',
+        hf_path='MaLA-LM/peS2o-final',
+        text_field='content',
         target_tokens=1_000_000_000,
         min_length=1000,
     ),
     SourceConfig(
+        # Replaces nampdn-ai/tiny-textbooks (gated, requires HF auth).
+        # HuggingFaceTB/cosmopedia is the Phi-1.5-style synthetic textbook
+        # corpus, apache-2.0 + ungated + parquet. The `stanford` config is
+        # CS-focused synthetic textbooks (~3.3 GB, well over 0.5B tokens).
         name='textbooks',
-        hf_path='nampdn-ai/tiny-textbooks',
-        text_field='textbook',
+        hf_path='HuggingFaceTB/cosmopedia',
+        hf_config='stanford',
         target_tokens=500_000_000,
         min_length=100,
     ),
@@ -254,13 +269,14 @@ def process_source(
         'tokens_val': 0,
     }
 
-    # Load dataset (streaming to avoid downloading everything)
+    # Load dataset (streaming to avoid downloading everything).
+    # trust_remote_code removed: datasets>=5.0 no longer supports Python loader
+    # scripts. All current sources are parquet-native.
     dataset = load_dataset(
         config.hf_path,
         config.hf_config,
         split='train',
         streaming=True,
-        trust_remote_code=True,
     )
 
     t_start = time.time()

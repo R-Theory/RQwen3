@@ -4,12 +4,11 @@ tags:
   - deep-learning
   - transformer
   - from-scratch
-  - longleaf
 created: 2026-03-23
+updated: 2026-06-15
 status: in-progress
 related:
-  - "[[cluster-operations]]"
-  - "[[slurm-longleaf-guide]]"
+  - "[[data-pipeline]]"
 ---
 
 # Qwen3 Analysis — Project Overview
@@ -27,7 +26,7 @@ The centerpiece is **RQwen3** — a custom 751M-parameter transformer matching Q
 - **Post-training pipeline**: The 4-stage process (long CoT cold start → reasoning RL → thinking mode fusion → general RL)
 - **Thinking modes**: How `/think` and `/no_think` tokens control reasoning behavior
 - **Weight inspection**: Layer-by-layer analysis comparing untrained vs pretrained models
-- **Pre-training at scale**: Training RQwen3 on UNC's Longleaf HPC cluster
+- **Pre-training at scale**: training RQwen3 on a curated 13B-token dataset
 
 ---
 
@@ -63,7 +62,7 @@ Custom implementation matching Qwen3-0.6B scale:
 ## Project Structure
 
 ```
-Qwen3 Analysis/
+RQwen3/
 ├── src/                    ← Custom deep learning library
 │   ├── config.py           CoreConfig dataclass
 │   ├── core.py             CoreBlock base class
@@ -84,20 +83,12 @@ Qwen3 Analysis/
 │
 ├── notebooks/              ← Sequential exploration (01–07)
 ├── scripts/
-│   ├── py/                 Training sessions, chat, RL experiments
-│   └── build_dataset.py    Pre-tokenize & build training data (see [[data-pipeline]])
-├── longleaf/               ← HPC cluster infrastructure
-│   ├── setup.sh            One-time cluster setup
-│   ├── pretrain.slurm      24-hour A100 training job
-│   ├── build-data.slurm    CPU-only dataset build job
-│   ├── smoke-pretrain.slurm 15-minute smoke test
-│   ├── test-gpu.slurm      GPU verification
-│   └── scripts/py/         Cluster-specific training scripts
+│   ├── py/                 Training sessions, chat
+│   ├── build_dataset.py    Pre-tokenize & build training data (see [[data-pipeline]])
+│   └── stitch_manifest.py  Merge shard manifests after a multi-job dataset build
 ├── checkpoints/            ← Training checkpoints (.pt files)
 ├── snapshots/              ← Model state snapshots at key points
-├── docs/                   ← Documentation (you are here)
-├── Makefile                Longleaf workflow automation
-└── .rsyncignore            Cluster sync exclusions
+└── docs/                   ← Documentation (you are here)
 ```
 
 ---
@@ -114,25 +105,22 @@ Sequential learning path — each builds on the previous:
 | 04 | `04-untrained-vs-trained` | Compared random init vs pretrained — weight distributions, output quality | Complete |
 | 05 | `05-train-rqwen3` | First training run — 200 steps on TinyStories using MPS | Complete |
 | 06 | `06-supervised-finetuning` | SFT concepts and implementation planning | In Progress |
-| 07 | `07-pretrain-rqwen3` | Full pretraining setup, cluster config, training loop design | Complete |
+| 07 | `07-pretrain-rqwen3` | Full pretraining setup, training loop design | Complete |
 
 **Exploratory notebooks** (earlier experiments, not numbered):
 - `Basics AI.ipynb` — Foundational concepts
 - `My Qwen3.ipynb` — Initial Qwen3 experiments
-- `Qwen3 Visual Anylasis.ipynb` — Early visualization work
+- `Qwen3 Visual Analysis.ipynb` — Early visualization work
 - `RQwen3.ipynb`, `Rqwen.ipynb` — Model prototyping
 
 ---
 
 ## Training Scripts
 
-| Script | Purpose | Runs On |
-|--------|---------|---------|
-| `scripts/py/TrainSession.py` | Training session class — optimizer, scheduler, train loop, checkpointing, sample generation | Both |
-| `scripts/py/ChatSession.py` | Interactive chat interface for inference | Local |
-| `scripts/py/RLModel0.py` | Reinforcement learning experiments | Local |
-| `longleaf/scripts/py/pretrain.py` | Full pretraining — 10K steps, FineWeb-Edu, auto-resume, SIGTERM handling | Cluster |
-| `longleaf/scripts/py/smoke_pretrain.py` | Smoke test — 20 steps, TinyStories, quick validation | Cluster |
+| Script | Purpose |
+|--------|---------|
+| `scripts/py/TrainSession.py` | Training session class — optimizer, scheduler, train loop, checkpointing, sample generation |
+| `scripts/py/ChatSession.py` | Interactive chat interface for inference |
 
 ---
 
@@ -152,139 +140,48 @@ Sequential learning path — each builds on the previous:
 - `checkpoints/step_100.pt`, `step_200.pt`, `step_200_final.pt`
 - `snapshots/untrained.pt`, `untrained-init.pt`, `pre-train-start.pt`, `pre-trained.pt`
 
-### Phase 2: Cluster Training (In Progress)
+### Phase 2: Pretraining (In Progress)
 
 | Detail | Value |
 |--------|-------|
-| Cluster | UNC Longleaf HPC |
-| Partition | `a100-gpu` (8 nodes, 24x A100 40GB PCIe) |
-| Full pretrain | 10,000 steps on FineWeb-Edu |
-| Effective batch | 128 (batch_size=4 × grad_accum=32) |
+| Full pretrain | 50,000 steps on the curated 6-source dataset (~13 B tokens, ~1 epoch) |
+| Effective batch | 128 (`batch_size=2 × grad_accum=64`) |
 | Tokens per step | ~262K |
-| Wall time | 24 hours per submission |
+| Precision | bf16 autocast on CUDA; SDPA (FlashAttention dispatch) for attention |
 | Auto-resume | Yes — SIGTERM checkpoint + scan for latest `.pt` |
 
-**Current status:** Smoke test job `38785256` submitted to a100-gpu, waiting in queue (estimated start ~Mar 24 7:25 AM). Full pretrain ready to submit after smoke test passes.
+The microbatch was reduced from `4 → 2` (with `grad_accum 32 → 64`) to keep the fp32 softmax stable at 151,936 vocab × 2048 seq.
+
+**Current status (2026-06-15):** Smoke green; full pretrain in flight. Step **~35,170 / 50,000** (~70%); loss **11.88 → 2.53**; projected final loss ~2.44 at step 50K.
 
 ### Phase 3: Data Pipeline (Complete)
 
 Built a production-grade data preprocessing pipeline. See [[data-pipeline]] for full details.
 
-- **6 curated sources**: FineWeb-Edu, Wikipedia, OpenWebMath, StackExchange, peS2o, textbooks (~13B tokens)
+- **6 curated sources**: FineWeb-Edu, Wikipedia, OpenWebMath, StackExchange, peS2o (`MaLA-LM/peS2o-final`), textbooks (`HuggingFaceTB/cosmopedia` config `stanford`) — ~13B tokens
 - **Quality filtering**: score thresholds, length bounds, source-specific rules
 - **Deduplication**: exact SHA-256 hash within each source
 - **Pre-tokenization**: binary uint32 shards, memory-mapped for O(1) random access
 - **Reproducibility**: deterministic train/val split, data offset checkpointing for exact resume
-
----
-
-## Cluster Setup Journey
-
-Chronological log of getting the training pipeline working on Longleaf. Every one of these was a real bug that had to be diagnosed and fixed.
-
-### Bug 1: PROJECT_ROOT Path
-
-**Problem:** `pretrain.py` had `os.path.join(os.path.dirname(__file__), "..")` — only goes up 1 level to `longleaf/scripts/`, not the project root.
-
-**Fix:** Changed to `"..", "..", ".."` (3 levels: `py/` → `scripts/` → `longleaf/` → root).
-
-**Lesson:** Always trace the actual directory levels when building relative paths.
-
-### Bug 2: Venv Not Activated
-
-**Problem:** `pretrain.slurm` had the venv activation commented out with a placeholder path.
-
-**Fix:** Uncommented and set to `/work/users/t/r/treese20/envs/qwen3/bin/activate`.
-
-**Lesson:** SLURM jobs don't inherit your shell environment. Everything must be explicit.
-
-### Bug 3: Wrong GRES Name
-
-**Problem:** Used `gpu:a100:1` — SLURM rejected it with "Requested node configuration is not available."
-
-**Fix:** Ran `sinfo` to discover the actual name: `gpu:nvidia_a100-pcie-40gb:1`.
-
-**Lesson:** GRES names are cluster-specific. Always check with `sinfo -p <partition> -o "%G"`.
-
-### Bug 4: Wrong Partition
-
-**Problem:** Used `--partition=gpu` — that partition has GTX 1080s with only 8GB VRAM.
-
-**Fix:** Changed to `--partition=a100-gpu`.
-
-**Lesson:** Partition names aren't standardized. `sinfo` shows what's available.
-
-### Bug 5: Module Version Mismatch
-
-**Problem:** SLURM scripts had `python/3.11` and `cuda/12.1`, but `setup.sh` installed `python/3.12` and `cuda/12.2`.
-
-**Fix:** Updated all SLURM scripts and `.bashrc` to match: `python/3.12`, `cuda/12.2`.
-
-**Lesson:** Keep module versions consistent between setup and job scripts.
-
-### Bug 6: QOS Required
-
-**Problem:** Submitting without `--qos` failed with "Invalid qos specification."
-
-**Fix:** Ran `sacctmgr show qos` to find available QOS values, added `--qos=gpu_access`.
-
-**Lesson:** Some partitions require a specific QOS. Check with `sacctmgr`.
-
-### Bug 7: A100 is 40GB, Not 80GB
-
-**Problem:** `batch_size=16` was configured for 80GB A100 SXM — Longleaf has 40GB PCIe.
-
-**Fix:** Reduced `batch_size` from 16 → 4 and increased `grad_accum_steps` from 8 → 32 (effective batch stays 128).
-
-**Lesson:** A100 comes in two variants. Always check actual VRAM with `nvidia-smi` or `sinfo`.
-
----
-
-## Makefile Workflow
-
-All cluster interaction goes through `make`:
-
-```bash
-# First time setup
-make ssh           # Authenticate to Longleaf
-make setup         # Create dirs + venv on cluster
-
-# Daily workflow
-make sync          # Push code changes
-make submit        # Sync + submit pretrain job
-make submit JOB=smoke-pretrain  # Submit smoke test
-make status        # Check job queue
-make logs          # Tail latest log
-make pull          # Download checkpoints, snapshots, logs
-
-# Utilities
-make test          # Submit GPU verification
-make cancel JOB=38785256  # Cancel a job
-make remote-ls     # List files on cluster
-make sync-dry      # Preview what would sync
-```
-
-See [[cluster-operations]] for detailed commands and troubleshooting.
+- **Multi-job build**: `scripts/stitch_manifest.py` re-scans shards and writes a unified `manifest.json`
 
 ---
 
 ## Next Steps
 
 - [x] Build data pipeline (6-source, filtered, deduplicated, pre-tokenized)
-- [ ] Build dataset on Longleaf (`sbatch longleaf/build-data.slurm`)
-- [ ] Run score threshold ablation (score >= 2 vs 3 vs 4) to validate filtering
-- [ ] Submit full pretrain (50K steps, ~13B tokens, curated mixed dataset)
+- [x] Build curated dataset (~13B tokens, all 6 sources, stitched via `stitch_manifest.py`)
+- [x] Submit full pretrain (50K steps) — **in flight**, 70% complete
+- [ ] Verify final checkpoint at step 50K, generate samples
 - [ ] Set up evaluation suite (lm-evaluation-harness: ARC, HellaSwag, MMLU)
-- [ ] Run domain mixing ablation (single source vs 6-source mix)
 - [ ] Complete supervised finetuning notebook (06)
-- [ ] Explore MoE routing in larger Qwen3 models (30B-A3B)
+- [ ] Optional: checkpoint-pruning script
+- [ ] Run score threshold ablation (score >= 2 vs 3 vs 4) — backlog
+- [ ] Run domain mixing ablation (single source vs 6-source mix) — backlog
+- [ ] Explore MoE routing in larger Qwen3 models (30B-A3B) — backlog
 
 ---
 
 ## Related Documentation
 
 - [[data-pipeline]] — Dataset curation, preprocessing pipeline, storage format
-- [[cluster-operations]] — Practical commands for monitoring and troubleshooting cluster jobs
-- [[slurm-longleaf-guide]] — SLURM fundamentals, script anatomy, auto-resume system
-- O-Vault: `Projects/resources/LongLeaf/00-07` — Comprehensive Longleaf reference series
-- O-Vault: `Topics/AI/ML & DL/research-notes/AI Models/Qwen3/` — Architectural analysis notes

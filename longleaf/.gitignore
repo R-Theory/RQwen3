@@ -1,3 +1,0 @@
-# SLURM log output (generated on cluster, pulled separately)
-logs/*.out
-logs/*.err

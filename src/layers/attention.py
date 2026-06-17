@@ -8,6 +8,7 @@ Add your own attention variants here (MHA, MQA, FlashAttention wrappers, etc.).
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from ..config import CoreConfig
 from ..core import CoreBlock
@@ -53,20 +54,28 @@ class GQAttention(CoreBlock):
         k = k.repeat_interleave(self.num_kv_groups, dim=1)
         v = v.repeat_interleave(self.num_kv_groups, dim=1)
 
-        scale = self.head_dim ** -0.5
-        attn_weights = (q @ k.transpose(-2, -1)) * scale
-
-        causal_mask = torch.triu(
-            torch.full((seq_len, seq_len), float('-inf'), device=x.device, dtype=q.dtype),
-            diagonal=1,
-        )
-        attn_weights = attn_weights + causal_mask
-        attn_weights = torch.softmax(attn_weights, dim=-1)
-        attn_weights = self.attn_dropout(attn_weights)
-
         if store_attn:
+            # Manual attention path — used only for visualization. Materializes
+            # the full (B, H, T, T) matrix; OK for inspection, blows up at long T.
+            scale = self.head_dim ** -0.5
+            attn_weights = (q @ k.transpose(-2, -1)) * scale
+            causal_mask = torch.triu(
+                torch.full((seq_len, seq_len), float('-inf'), device=x.device, dtype=q.dtype),
+                diagonal=1,
+            )
+            attn_weights = attn_weights + causal_mask
+            attn_weights = torch.softmax(attn_weights, dim=-1)
+            attn_weights = self.attn_dropout(attn_weights)
             self._attn_weights = attn_weights.detach().cpu()
+            attn_output = attn_weights @ v
+        else:
+            # Fast path: SDPA dispatches to FlashAttention on Ampere/Ada/Hopper,
+            # avoiding the O(T^2) score materialization that OOMs at seq=2048.
+            attn_output = F.scaled_dot_product_attention(
+                q, k, v,
+                is_causal=True,
+                dropout_p=self.attn_dropout.p if self.training else 0.0,
+            )
 
-        attn_output = attn_weights @ v
         attn_output = attn_output.transpose(1, 2).contiguous().view(batch, seq_len, -1)
         return self.resid_dropout(self.o_proj(attn_output))
