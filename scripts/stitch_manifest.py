@@ -6,8 +6,7 @@ consolidate a unified manifest covering all shards present in the dataset
 directory.
 
 Usage:
-    python scripts/stitch_manifest.py /path/to/v1
-    python scripts/stitch_manifest.py /work/users/t/r/treese20/data/rqwen3-pretrain/v1
+    python scripts/stitch_manifest.py /path/to/data/v1
 """
 
 import argparse

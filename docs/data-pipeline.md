@@ -9,9 +9,7 @@ created: 2026-04-01
 updated: 2026-06-15
 status: complete
 related:
-  - "[[project-overview]]"
-  - "[[cluster-operations]]"
-  - "[[slurm-longleaf-guide]]"
+  - project-overview.md
 ---
 
 # Data Pipeline
@@ -337,4 +335,4 @@ print(text[:500])
 
 ## Related
 
-- [[project-overview]] — Architecture and training progress
+- [project-overview](project-overview.md) — Architecture and training progress

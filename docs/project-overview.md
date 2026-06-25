@@ -5,10 +5,11 @@ tags:
   - transformer
   - from-scratch
 created: 2026-03-23
-updated: 2026-06-15
+updated: 2026-06-19
 status: in-progress
 related:
-  - "[[data-pipeline]]"
+  - data-pipeline.md
+  - pretraining-results.md
 ---
 
 # Qwen3 Analysis — Project Overview
@@ -84,7 +85,7 @@ RQwen3/
 ├── notebooks/              ← Sequential exploration (01–07)
 ├── scripts/
 │   ├── py/                 Training sessions, chat
-│   ├── build_dataset.py    Pre-tokenize & build training data (see [[data-pipeline]])
+│   ├── build_dataset.py    Pre-tokenize & build training data (see data-pipeline.md)
 │   └── stitch_manifest.py  Merge shard manifests after a multi-job dataset build
 ├── checkpoints/            ← Training checkpoints (.pt files)
 ├── snapshots/              ← Model state snapshots at key points
@@ -140,7 +141,7 @@ Sequential learning path — each builds on the previous:
 - `checkpoints/step_100.pt`, `step_200.pt`, `step_200_final.pt`
 - `snapshots/untrained.pt`, `untrained-init.pt`, `pre-train-start.pt`, `pre-trained.pt`
 
-### Phase 2: Pretraining (In Progress)
+### Phase 2: Pretraining (Complete)
 
 | Detail | Value |
 |--------|-------|
@@ -152,11 +153,11 @@ Sequential learning path — each builds on the previous:
 
 The microbatch was reduced from `4 → 2` (with `grad_accum 32 → 64`) to keep the fp32 softmax stable at 151,936 vocab × 2048 seq.
 
-**Current status (2026-06-15):** Smoke green; full pretrain in flight. Step **~35,170 / 50,000** (~70%); loss **11.88 → 2.53**; projected final loss ~2.44 at step 50K.
+**Result (2026-06-19):** 50,000 / 50,000 steps reached on UNC Longleaf `l40-gpu` (NVIDIA L40S 48 GB). Loss **11.88 → 2.5186** (perplexity ≈ 12.4). Took **10 successful SLURM submissions over ~11 wall-clock days** (2026-06-08 → 2026-06-19), plus 3 OOM crashes and 2 user-cancels during the memory-wall fix on day 1. Base model checkpoint at `checkpoints/final.pt`. Full journey, sample-evolution log, bug list, and self-critique: [pretraining-results](pretraining-results.md).
 
 ### Phase 3: Data Pipeline (Complete)
 
-Built a production-grade data preprocessing pipeline. See [[data-pipeline]] for full details.
+Built a production-grade data preprocessing pipeline. See [data-pipeline](data-pipeline.md) for full details.
 
 - **6 curated sources**: FineWeb-Edu, Wikipedia, OpenWebMath, StackExchange, peS2o (`MaLA-LM/peS2o-final`), textbooks (`HuggingFaceTB/cosmopedia` config `stanford`) — ~13B tokens
 - **Quality filtering**: score thresholds, length bounds, source-specific rules
@@ -171,11 +172,12 @@ Built a production-grade data preprocessing pipeline. See [[data-pipeline]] for 
 
 - [x] Build data pipeline (6-source, filtered, deduplicated, pre-tokenized)
 - [x] Build curated dataset (~13B tokens, all 6 sources, stitched via `stitch_manifest.py`)
-- [x] Submit full pretrain (50K steps) — **in flight**, 70% complete
-- [ ] Verify final checkpoint at step 50K, generate samples
-- [ ] Set up evaluation suite (lm-evaluation-harness: ARC, HellaSwag, MMLU)
-- [ ] Complete supervised finetuning notebook (06)
-- [ ] Optional: checkpoint-pruning script
+- [x] Submit full pretrain (50K steps) — **complete**, final loss 2.5186
+- [ ] Pull `final.pt` locally and generate inspection samples
+- [ ] Set up evaluation suite (lm-evaluation-harness: ARC, HellaSwag, MMLU) — **primary next move**
+- [ ] Complete supervised finetuning notebook (06) on top of `final.pt` — **primary next move**
+- [ ] Publish case-study post (spine in [case-study-outline](case-study-outline.md))
+- [ ] Checkpoint-pruning script (429 GB on `/work` currently — keep `step_1000`, every 5K, latest 3)
 - [ ] Run score threshold ablation (score >= 2 vs 3 vs 4) — backlog
 - [ ] Run domain mixing ablation (single source vs 6-source mix) — backlog
 - [ ] Explore MoE routing in larger Qwen3 models (30B-A3B) — backlog
@@ -184,4 +186,5 @@ Built a production-grade data preprocessing pipeline. See [[data-pipeline]] for 
 
 ## Related Documentation
 
-- [[data-pipeline]] — Dataset curation, preprocessing pipeline, storage format
+- [pretraining-results](pretraining-results.md) — Full pretraining journey, loss trajectory, sample evolution, bugs encountered
+- [data-pipeline](data-pipeline.md) — Dataset curation, preprocessing pipeline, storage format

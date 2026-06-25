@@ -2,7 +2,7 @@
 
 Building the Qwen3 architecture from scratch and training at scale. A hands-on deep dive into modern transformer innovations: RoPE, GQA, SwiGLU, RMSNorm, and MoE design.
 
-**Status (2026-06-15):** Pretrain at ~35,170 / 50,000 steps (~70%), loss 11.88 → 2.53.
+**Status (2026-06-19):** Pretrain **complete** — 50,000 / 50,000 steps, loss 11.88 → **2.5186** (perplexity ≈ 12.4). Base model at `checkpoints/final.pt`. 10 SLURM submissions over ~11 wall-clock days on UNC Longleaf L40S. Full journey: [docs/pretraining-results.md](docs/pretraining-results.md). Next: eval suite + SFT (notebook 06).
 
 ## Quick Start
 
@@ -11,7 +11,7 @@ Building the Qwen3 architecture from scratch and training at scale. A hands-on d
 ```bash
 # From the project root
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-local.txt
 
 # Launch notebooks
 jupyter lab
@@ -89,10 +89,11 @@ Custom 751M-parameter transformer matching Qwen3-0.6B:
 
 Built a 6-source, ~13B-token curated dataset: FineWeb-Edu (54%), Wikipedia (15%), OpenWebMath (12%), StackExchange (8%), peS2o (8%), textbooks (4%). Quality-filtered, deduplicated, pre-tokenized into binary shards. See [docs/data-pipeline.md](docs/data-pipeline.md).
 
-### Pretraining (In Progress)
+### Pretraining (Complete)
 
 - **Full pretrain:** 50,000 steps · effective batch 128 (`batch_size=2 × grad_accum=64`) · bf16 autocast · SDPA attention
-- **Progress (2026-06-15):** step ~35,170 / 50,000 (~70%); loss 11.88 → 2.53; projected final ~2.44
+- **Result (2026-06-19):** 50,000 / 50,000 steps · loss **11.88 → 2.5186** (perplexity ≈ 12.4) · 10 SLURM submissions over ~11 wall-clock days · final checkpoint at `checkpoints/final.pt`
+- Full journey, sample evolution, bug log: [docs/pretraining-results.md](docs/pretraining-results.md)
 
 ## Documentation
 
@@ -100,13 +101,18 @@ Built a 6-source, ~13B-token curated dataset: FineWeb-Edu (54%), Wikipedia (15%)
 |-----|----------------|
 | [docs/project-overview.md](docs/project-overview.md) | Full project documentation, architecture, progress log |
 | [docs/data-pipeline.md](docs/data-pipeline.md) | Dataset curation, preprocessing pipeline, storage format |
+| [docs/pretraining-results.md](docs/pretraining-results.md) | Full pretraining journey: loss trajectory, sample evolution per checkpoint, bug log, SLURM submission timeline |
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
 
 ## What's Next
 
 - [x] Build curated dataset — ~13B tokens, 6 sources
-- [x] Full pretrain (50K steps) — **in flight**, 70% complete
-- [ ] Verify final checkpoint at step 50K, generate samples
-- [ ] Set up evaluation suite (lm-evaluation-harness)
+- [x] Full pretrain (50K steps) — **complete**, final loss **2.5186**
+- [ ] Pull `final.pt` locally, generate inspection samples
+- [ ] Set up evaluation suite (lm-evaluation-harness: ARC, HellaSwag, MMLU)
 - [ ] Complete supervised finetuning notebook
 - [ ] Checkpoint-pruning script
 - [ ] Backlog: score-threshold ablation, domain-mixing ablation, MoE routing in larger Qwen3 models
