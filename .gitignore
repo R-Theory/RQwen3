@@ -35,10 +35,25 @@ checkpoints_local/
 figures/*
 !figures/.gitkeep
 
-# Cluster surface — personal paths embedded; public version TBD
+# Internal — personal paths embedded or planning material; not for public repo
 longleaf/
 Makefile
 .rsyncignore
 scripts/sh/
 docs/cluster-operations.md
 docs/slurm-longleaf-guide.md
+docs/case-study-outline.md
+docs/case-study-plan.md
+docs/roadmap.md
+
+# Notebooks — scratch, predecessors, or not-yet-real
+notebooks/My Qwen3.ipynb
+notebooks/Rqwen.ipynb
+notebooks/RQwen3.ipynb
+notebooks/Qwen3 Visual Analysis.ipynb
+notebooks/Basics AI.ipynb
+notebooks/qwen1_7B_architecture
+notebooks/06-supervised-finetuning.ipynb
+
+# Early prototypes
+scripts/py/RLModel0.py

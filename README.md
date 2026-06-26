@@ -65,7 +65,6 @@ jupyter lab
 | 03 | `03-visual-model-analysis` | Attention heatmaps, activation norms | Complete |
 | 04 | `04-untrained-vs-trained` | Random init vs pretrained weight analysis | Complete |
 | 05 | `05-train-rqwen3` | First training run (200 steps, MPS) | Complete |
-| 06 | `06-supervised-finetuning` | SFT concepts and implementation | In Progress |
 | 07 | `07-pretrain-rqwen3` | Full pretraining setup | Complete |
 
 ### `scripts/` — Training & Inference
