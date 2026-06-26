@@ -1,6 +1,6 @@
-# Qwen3 Analysis
+# RQwen3
 
-Building the Qwen3 architecture from scratch and training at scale. A hands-on deep dive into modern transformer innovations: RoPE, GQA, SwiGLU, RMSNorm, and MoE design.
+A 751M-parameter language model built from scratch, architecturally matching Qwen3-0.6B (RoPE, GQA, SwiGLU, RMSNorm, QK-Norm), and pretrained on ~13B tokens of curated educational data on UNC Longleaf. This repo is the full case study: architecture, training pipeline, results, and the bugs along the way.
 
 **Status (2026-06-19):** Pretrain **complete** — 50,000 / 50,000 steps, loss 11.88 → **2.5186** (perplexity ≈ 12.4). Base model at `checkpoints/final.pt`. 10 SLURM submissions over ~11 wall-clock days on UNC Longleaf L40S. Full journey: [docs/pretraining-results.md](docs/pretraining-results.md). Next: eval suite + SFT (notebook 06).
 
@@ -17,9 +17,9 @@ pip install -r requirements-local.txt
 jupyter lab
 ```
 
-## Architecture: RQwen3
+## Architecture
 
-Custom 751M-parameter transformer matching Qwen3-0.6B:
+751M-parameter transformer matching Qwen3-0.6B:
 
 | Parameter | Value |
 |-----------|-------|
