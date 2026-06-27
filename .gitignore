@@ -34,6 +34,7 @@ checkpoints
 checkpoints_local/
 figures/*
 !figures/.gitkeep
+!figures/loss_curve.png
 
 # Internal — personal paths embedded or planning material; not for public repo
 longleaf/
@@ -44,7 +45,6 @@ docs/cluster-operations.md
 docs/slurm-longleaf-guide.md
 docs/case-study-outline.md
 docs/case-study-plan.md
-docs/roadmap.md
 
 # Notebooks — scratch, predecessors, or not-yet-real
 notebooks/My Qwen3.ipynb
