@@ -32,6 +32,7 @@ snapshots/*
 !snapshots/.gitkeep
 checkpoints
 checkpoints_local/
+hf-export/
 figures/*
 !figures/.gitkeep
 !figures/loss_curve.png

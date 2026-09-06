@@ -75,6 +75,7 @@ jupyter lab
 | `scripts/py/ChatSession.py` | Interactive chat with trained models |
 | `scripts/build_dataset.py` | Build pre-tokenized training data from 6 curated sources |
 | `scripts/stitch_manifest.py` | Re-scan shards & write a unified `manifest.json` after a multi-job dataset build |
+| `scripts/export_to_hf.py` | Convert `final.pt` to a Hugging Face `Qwen3ForCausalLM` repo — verifies fp32 parity against `src/` and round-trips the written files before publishing |
 
 ## Training Progress
 
@@ -101,6 +102,7 @@ Built a 6-source, ~13B-token curated dataset: FineWeb-Edu (54%), Wikipedia (15%)
 | [docs/project-overview.md](docs/project-overview.md) | Full project documentation, architecture, progress log |
 | [docs/data-pipeline.md](docs/data-pipeline.md) | Dataset curation, preprocessing pipeline, storage format |
 | [docs/pretraining-results.md](docs/pretraining-results.md) | Full pretraining journey: loss trajectory, sample evolution per checkpoint, bug log, SLURM submission timeline |
+| [docs/huggingface-release.md](docs/huggingface-release.md) | Publishing the model to the Hugging Face Hub: what the export verifies, the runbook, and the open decisions |
 
 ## License
 
@@ -110,7 +112,9 @@ Licensed under the [Apache License 2.0](LICENSE).
 
 - [x] Build curated dataset — ~13B tokens, 6 sources
 - [x] Full pretrain (50K steps) — **complete**, final loss **2.5186**
+- [x] Hugging Face export pipeline — `scripts/export_to_hf.py`, verified bit-exact at production scale
 - [ ] Pull `final.pt` locally, generate inspection samples
+- [ ] Publish to the Hub — see [docs/huggingface-release.md](docs/huggingface-release.md)
 - [ ] Set up evaluation suite (lm-evaluation-harness: ARC, HellaSwag, MMLU)
 - [ ] Complete supervised finetuning notebook
 - [ ] Checkpoint-pruning script
