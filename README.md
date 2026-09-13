@@ -2,7 +2,11 @@
 
 A 751M-parameter language model built from scratch, architecturally matching Qwen3-0.6B (RoPE, GQA, SwiGLU, RMSNorm, QK-Norm), and pretrained on ~13B tokens of curated educational data on UNC Longleaf. This repo is the full case study: architecture, training pipeline, results, and the bugs along the way.
 
-**Status (2026-06-19):** Pretrain **complete** — 50,000 / 50,000 steps, loss 11.88 → **2.5186** (perplexity ≈ 12.4). Base model at `checkpoints/final.pt`. 10 SLURM submissions over ~11 wall-clock days on UNC Longleaf L40S. Full journey: [docs/pretraining-results.md](docs/pretraining-results.md). Next: eval suite + SFT (notebook 06).
+![Loss curve: 11.88 → 2.5186 over 50,000 steps](figures/loss_curve.png)
+
+**Status (2026-06-19):** Pretrain **complete** — 50,000 / 50,000 steps, loss 11.88 → **2.5186** (perplexity ≈ 12.4). Base model at `checkpoints/final.pt`. 10 SLURM submissions over ~11 wall-clock days on UNC Longleaf L40S. Full journey: [docs/pretraining-results.md](docs/pretraining-results.md). Next: held-out val loss, HF Hub weights + model card, and `lm-evaluation-harness` (ARC / HellaSwag / MMLU).
+
+Developed inside a private study monorepo; this repo is the extracted, cleaned public version. Eval and SFT work will accumulate here directly.
 
 ## Quick Start
 
@@ -10,8 +14,9 @@ A 751M-parameter language model built from scratch, architecturally matching Qwe
 
 ```bash
 # From the project root
+python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements-local.txt
+pip install -e .
 
 # Launch notebooks
 jupyter lab
@@ -75,6 +80,7 @@ jupyter lab
 | `scripts/py/ChatSession.py` | Interactive chat with trained models |
 | `scripts/build_dataset.py` | Build pre-tokenized training data from 6 curated sources |
 | `scripts/stitch_manifest.py` | Re-scan shards & write a unified `manifest.json` after a multi-job dataset build |
+| `scripts/export_to_hf.py` | Convert `final.pt` to a Hugging Face `Qwen3ForCausalLM` repo — verifies fp32 parity against `src/` and round-trips the written files before publishing |
 
 ## Training Progress
 
@@ -101,6 +107,8 @@ Built a 6-source, ~13B-token curated dataset: FineWeb-Edu (54%), Wikipedia (15%)
 | [docs/project-overview.md](docs/project-overview.md) | Full project documentation, architecture, progress log |
 | [docs/data-pipeline.md](docs/data-pipeline.md) | Dataset curation, preprocessing pipeline, storage format |
 | [docs/pretraining-results.md](docs/pretraining-results.md) | Full pretraining journey: loss trajectory, sample evolution per checkpoint, bug log, SLURM submission timeline |
+| [docs/huggingface-release.md](docs/huggingface-release.md) | Publishing the model to the Hugging Face Hub: what the export verifies, the runbook, and the open decisions |
+| [RECEIPTS.md](RECEIPTS.md) | Public receipts for the case study — SLURM jobs, loss trajectory, training config, architecture, sample evolution, dataset manifest |
 
 ## License
 
@@ -110,8 +118,11 @@ Licensed under the [Apache License 2.0](LICENSE).
 
 - [x] Build curated dataset — ~13B tokens, 6 sources
 - [x] Full pretrain (50K steps) — **complete**, final loss **2.5186**
-- [ ] Pull `final.pt` locally, generate inspection samples
-- [ ] Set up evaluation suite (lm-evaluation-harness: ARC, HellaSwag, MMLU)
-- [ ] Complete supervised finetuning notebook
-- [ ] Checkpoint-pruning script
+- [x] Hugging Face export pipeline — `scripts/export_to_hf.py`, verified bit-exact at production scale
+- [ ] Held-out val loss on the reserved 0.1% split (`PreTokenizedDataset(split='val')`, `~13M tokens`)
+- [ ] Publish bf16 weights + model card on Hugging Face Hub — see [docs/huggingface-release.md](docs/huggingface-release.md)
+- [ ] Stand up `lm-evaluation-harness` (ARC-Challenge, HellaSwag, MMLU) — priors written before results
+- [ ] Complete supervised finetuning notebook (`notebooks/06-supervised-finetuning.ipynb`)
+- [ ] Small unit-test suite (RoPE / GQA / RMSNorm / checkpoint roundtrip) + CI badge
+- [ ] Checkpoint-pruning pass to reclaim ~270 GB on `/work`
 - [ ] Backlog: score-threshold ablation, domain-mixing ablation, MoE routing in larger Qwen3 models

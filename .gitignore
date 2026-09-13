@@ -32,19 +32,21 @@ snapshots/*
 !snapshots/.gitkeep
 checkpoints
 checkpoints_local/
+hf-export/
 figures/*
 !figures/.gitkeep
 !figures/loss_curve.png
 
-# Internal — personal paths embedded or planning material; not for public repo
-longleaf/
-Makefile
+# Internal — planning material, not for public repo
 .rsyncignore
 scripts/sh/
 docs/cluster-operations.md
 docs/slurm-longleaf-guide.md
 docs/case-study-outline.md
 docs/case-study-plan.md
+
+# Local session prep artifacts (cluster commands, model card drafts, etc.)
+.plans/
 
 # Notebooks — scratch, predecessors, or not-yet-real
 notebooks/My Qwen3.ipynb
@@ -53,7 +55,6 @@ notebooks/RQwen3.ipynb
 notebooks/Qwen3 Visual Analysis.ipynb
 notebooks/Basics AI.ipynb
 notebooks/qwen1_7B_architecture
-notebooks/06-supervised-finetuning.ipynb
 
 # Early prototypes
 scripts/py/RLModel0.py
