@@ -119,9 +119,10 @@ Licensed under the [Apache License 2.0](LICENSE).
 - [x] Build curated dataset — ~13B tokens, 6 sources
 - [x] Full pretrain (50K steps) — **complete**, final loss **2.5186**
 - [x] Hugging Face export pipeline — `scripts/export_to_hf.py`, verified bit-exact at production scale
+- [x] `lm-evaluation-harness` on ARC-C / HellaSwag / MMLU — 0-shot baseline done (HellaSwag 31.5% vs 25% chance is the real signal; ARC-C + MMLU at chance, as expected at this scale)
 - [ ] Held-out val loss on the reserved 0.1% split (`PreTokenizedDataset(split='val')`, `~13M tokens`)
 - [ ] Publish bf16 weights + model card on Hugging Face Hub — see [docs/huggingface-release.md](docs/huggingface-release.md)
-- [ ] Stand up `lm-evaluation-harness` (ARC-Challenge, HellaSwag, MMLU) — priors written before results
+- [ ] 5-shot MMLU + 25-shot ARC-C for leaderboard-comparable numbers
 - [ ] Complete supervised finetuning notebook (`notebooks/06-supervised-finetuning.ipynb`)
 - [ ] Small unit-test suite (RoPE / GQA / RMSNorm / checkpoint roundtrip) + CI badge
 - [ ] Checkpoint-pruning pass to reclaim ~270 GB on `/work`

@@ -104,15 +104,31 @@ Details: [docs/data-pipeline.md](https://github.com/R-Theory/RQwen3/blob/main/do
 
 ## Evaluation
 
-**None yet.** No benchmark numbers have been run on this checkpoint — treat the training loss above
-as the only quantitative signal, and note that training loss is not comparable across different
-tokenizers or data mixes. Standard-benchmark results (ARC, HellaSwag, MMLU) are planned but not done,
-so do not assume any particular capability level from the loss figure alone.
+Run with [EleutherAI/lm-evaluation-harness](https://github.com/EleutherAI/lm-evaluation-harness)
+v0.4.13, `hf` backend, bf16 on a single L40S. All three tasks at the harness's registered defaults
+(0-shot for all three in 0.4.13).
 
-For rough context on the loss value: from-scratch dense models around this size typically land near
-~2.85 (GPT-2 large 774M, Pythia-410M) on their own training distributions, and Qwen3-0.6B reports
-~2.4 after ~5T tokens — roughly 400× more data than this run saw. These numbers come from different
-corpora and are **not** apples-to-apples.
+| Task | Config | Score | Chance |
+|---|---|---|---|
+| ARC-Challenge | 0-shot, `acc` | **24.32% ± 1.25** | 25% |
+| HellaSwag | 0-shot, `acc` | **31.47% ± 0.46** | 25% |
+| MMLU (all 57 subjects, average) | 0-shot, `acc` | **25.32% ± 0.37** | 25% |
+
+Reading these honestly:
+
+- **HellaSwag** is where the model actually has signal: **+6.5 points over chance**, well outside the
+  standard error. That's the model demonstrating learned commonsense-continuation ability from ~13B
+  tokens of predominantly educational web text.
+- **ARC-Challenge** and **MMLU** are at chance level. Both require multi-step reasoning and
+  broad-domain knowledge that a 751M base model trained on ~13B tokens has not acquired. This is the
+  expected outcome from scaling laws, not a bug.
+- 0-shot MMLU is not directly comparable to the 5-shot MMLU numbers reported in most base-model
+  papers. Standard 5-shot reporting is planned as a follow-up.
+
+For rough context on the training loss value above: from-scratch dense models around this size
+typically land near ~2.85 (GPT-2 large 774M, Pythia-410M) on their own training distributions, and
+Qwen3-0.6B reports ~2.4 after ~5T tokens — roughly 400× more data than this run saw. These numbers
+come from different corpora and are **not** apples-to-apples.
 
 ## Limitations
 
